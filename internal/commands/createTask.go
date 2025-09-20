@@ -9,23 +9,18 @@ import (
 
 func CreateTask() cobra.Command {
 
-	var taskName, taskDescription string
-
 	var command = &cobra.Command{
-		Use:   "create",
+		Use:   "create [description]",
 		Short: "Create a new task",
+		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			// validations
-			if taskName == "" {
-				fmt.Println("You must supply a task name.")
-				return
-			}
+			taskDescription := args[0]
 			if taskDescription == "" {
 				fmt.Println("You must supply a task description.")
 				return
 			}
 
-			err := repository.CreateTask(taskName, taskDescription)
+			err := repository.CreateTask(taskDescription)
 			if err != nil {
 				fmt.Println("Error creating task:", err)
 				return
@@ -33,9 +28,6 @@ func CreateTask() cobra.Command {
 			fmt.Println("Task created successfully!")
 		},
 	}
-
-	command.Flags().StringVarP(&taskName, "name", "n", "", "Name of the task")
-	command.Flags().StringVarP(&taskDescription, "description", "d", "", "Description of the task")
 
 	return *command
 }

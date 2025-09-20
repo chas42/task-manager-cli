@@ -2,46 +2,64 @@ package repository
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"time"
+
+	"github.com/chas42/task-manager-cli/internal/model"
 )
 
-type Status string
+const taskFile = "data/tasks.json"
 
-const (
-	TODO        Status = "todo"
-	IN_PROGRESS Status = "in-progress"
-	DONE        Status = "done"
-)
-
-type Task struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Status      Status `json:"status"`
-	CreatedAt   string `json:"createdAt"`
-	UpdatedAt   string `json:"updatedAt"`
-}
-
-func LoadTasks(status Status) ([]Task, error) {
-	data, err := os.ReadFile("tasks.json")
+func LoadTasksFromFile() ([]model.Task, error) {
+	file, err := os.OpenFile(taskFile, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(data) == 0 {
-		return []Task{}, nil
+		return []model.Task{}, nil
 	}
 
-	var tasks []Task
+	var tasks []model.Task
 	err = json.Unmarshal(data, &tasks)
 	if err != nil {
 		return nil, err
 	}
 
+	return tasks, nil
+}
+
+func saveTasks(tasks []model.Task) error {
+	file, err := os.OpenFile(taskFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	file.Truncate(0)
+	file.Seek(0, 0)
+
+	encoder := json.NewEncoder(file)
+	return encoder.Encode(tasks)
+}
+
+func LoadTasks(status model.Status) ([]model.Task, error) {
+	LoadTasksFromFile()
+	tasks, err := LoadTasksFromFile()
+	if err != nil {
+		return nil, err
+	}
+
 	if status != "" {
-		var filteredTasks []Task
+		var filteredTasks []model.Task
 		for _, task := range tasks {
 			if task.Status == status {
 				filteredTasks = append(filteredTasks, task)
@@ -53,24 +71,9 @@ func LoadTasks(status Status) ([]Task, error) {
 	return tasks, nil
 }
 
-func CreateTask(name string, description string) error {
+func CreateTask(description string) error {
 
-	file, err := os.OpenFile("tasks.json", os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
-
-	if len(data) == 0 {
-		data = []byte("[]")
-	}
-
-	var tasks []Task
-	err = json.Unmarshal(data, &tasks)
+	tasks, err := LoadTasksFromFile()
 	if err != nil {
 		return err
 	}
@@ -80,19 +83,109 @@ func CreateTask(name string, description string) error {
 		lastTaskID = tasks[len(tasks)-1].ID
 	}
 
-	task := Task{
+	task := model.Task{
 		ID:          lastTaskID + 1,
-		Name:        name,
 		Description: description,
-		Status:      TODO,
+		Status:      model.TODO,
 		CreatedAt:   time.Now().Format(time.RFC3339),
 		UpdatedAt:   time.Now().Format(time.RFC3339),
 	}
 
 	tasks = append(tasks, task)
-	file.Truncate(0)
-	file.Seek(0, 0)
 
-	encoder := json.NewEncoder(file)
-	return encoder.Encode(tasks)
+	err = saveTasks(tasks)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func UpdateTask(taskId int, description string) error {
+	tasks, err := LoadTasksFromFile()
+	if err != nil {
+		return err
+	}
+
+	taskFound := false
+	for i := 0; i < len(tasks); i++ {
+		if tasks[i].ID == taskId {
+			taskFound = true
+			tasks[i].Description = description
+			tasks[i].UpdatedAt = time.Now().Format(time.RFC3339)
+			break
+		}
+
+	}
+
+	if !taskFound {
+		errorMsg := fmt.Sprintf("Task with the given ID %d not found", taskId)
+		return errors.New(errorMsg)
+	}
+
+	err = saveTasks(tasks)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func MarkTask(taskId int, status model.Status) error {
+	tasks, err := LoadTasksFromFile()
+	if err != nil {
+		return err
+	}
+
+	taskFound := false
+	for i := 0; i < len(tasks); i++ {
+		if tasks[i].ID == taskId {
+			taskFound = true
+			tasks[i].Status = status
+			tasks[i].UpdatedAt = time.Now().Format(time.RFC3339)
+			break
+		}
+
+	}
+
+	if !taskFound {
+		errorMsg := fmt.Sprintf("Task with the given ID %d not found", taskId)
+		return errors.New(errorMsg)
+	}
+
+	err = saveTasks(tasks)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DeleteTask(taskId int) error {
+	tasks, err := LoadTasksFromFile()
+	if err != nil {
+		return err
+	}
+
+	taskFoundId := -1
+	for i := 0; i < len(tasks); i++ {
+		if tasks[i].ID == taskId {
+			taskFoundId = i
+			break
+		}
+	}
+
+	if taskFoundId == -1 {
+		errorMsg := fmt.Sprintf("Task with the given ID %d not found", taskId)
+		return errors.New(errorMsg)
+	}
+
+	tasks = append(tasks[:taskFoundId], tasks[taskFoundId+1:]...)
+
+	err = saveTasks(tasks)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

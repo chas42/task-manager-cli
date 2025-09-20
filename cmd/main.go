@@ -10,8 +10,14 @@ func main() {
 
 	createTask := commands.CreateTask()
 	listTask := commands.ListTask()
+	updateTask := commands.UpdateTask()
+	markTask := commands.MarkTask()
+	deleteTask := commands.DeleteTask()
 
 	rootCommand.AddCommand(&createTask)
 	rootCommand.AddCommand(&listTask)
+	rootCommand.AddCommand(&updateTask)
+	rootCommand.AddCommand(&markTask)
+	rootCommand.AddCommand(&deleteTask)
 	rootCommand.Execute()
 }
