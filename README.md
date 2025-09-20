@@ -1,7 +1,7 @@
 # task-manager-cli
 
 A simple command-line interface (CLI) tool for managing tasks.  
-Easily add, list, complete, and remove tasks directly from your terminal.
+Easily add, list, complete, and remove tasks directly from your terminal. This project is based on the requirements provided in https://roadmap.sh/projects/task-tracker . 
 
 ## Features
 
